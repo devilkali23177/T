@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All-in-One Management Tool</title>
+  <!-- Add Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <style>
+    :root {
+      --primary-color: #007bff;
+      --primary-dark: #0056b3;
+      --background: #eef1f4;
+      --card-bg: #ffffff;
+      --text-color: #333333;
+      --text-light: #777777;
+      --border-color: #dddddd;
+      --shadow-color: rgba(0, 0, 0, 0.1);
+      --progress-bg: #e0e0e0;
+    }
+
+    [data-theme="dark"] {
+      --primary-color: #4dabf7;
+      --primary-dark: #1971c2;
+      --background: #121212;
+      --card-bg: #1e1e1e;
+      --text-color: #f8f9fa;
+      --text-light: #adb5bd;
+      --border-color: #333333;
+      --shadow-color: rgba(0, 0, 0, 0.3);
+      --progress-bg: #333333;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: var(--background);
+      color: var(--text-color);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .tabs {
+      display: flex;
+      background-color: var(--primary-color);
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 15px;
+      text-align: center;
+      color: white;
+      cursor: pointer;
+      background-color: var(--primary-color);
+      border: none;
+      outline: none;
+      transition: background-color 0.3s ease;
+    }
+
+    .tab-button.active {
+      background-color: var(--primary-dark);
+    }
+
+    .tab-content {
+      display: none;
+      padding: 0;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    iframe {
+      width: 100%;
+      border: none;
+      background: var(--card-bg);
+    }
+
+    .auth-container {
+      padding: 20px;
+      background: var(--card-bg);
+      max-width: 400px;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px var(--shadow-color);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .auth-form input {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--card-bg);
+      color: var(--text-color);
+      transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .auth-form button {
+      padding: 10px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .auth-form button:hover {
+      background-color: var(--primary-dark);
+    }
+
+    .auth-status {
+      text-align: center;
+      margin-top: 10px;
+      font-weight: bold;
+      color: var(--text-color);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 5px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      box-shadow: 0 2px 5px var(--shadow-color);
+    }
+
+    .theme-toggle-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--primary-color);
+      color: white;
+      transition: transform 0.3s ease, background 0.3s ease;
+    }
+
+    [data-theme="dark"] .theme-toggle-icon {
+      transform: translateX(26px);
+      background: var(--primary-dark);
+    }
+
+    .theme-toggle-text {
+      margin: 0 10px;
+      font-size: 14px;
+      color: var(--text-color);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Theme Toggle -->
+<div class="theme-toggle" onclick="toggleTheme()">
+  <span class="theme-toggle-text">Light</span>
+  <div class="theme-toggle-icon">
+    <span id="themeIcon">☀️</span>
+  </div>
+  <span class="theme-toggle-text">Dark</span>
+</div>
+
+<!-- Firebase Authentication UI -->
+<div id="authContainer" class="auth-container">
+  <h2 style="text-align: center;">Login</h2>
+  <div class="auth-form">
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="signup()">Sign Up</button>
+  </div>
+  <div id="authStatus" class="auth-status"></div>
+</div>
+
+<!-- Main App Content (hidden until authenticated) -->
+<div id="appContent" class="hidden">
+  <div class="tabs">
+    <button class="tab-button active" onclick="showTab('emiTab')">EMI Tracker</button>
+    <button class="tab-button" onclick="showTab('salaryTab')">Salary Slip</button>
+    <button class="tab-button" onclick="showTab('studyTab')">Study Planner</button>
+    <button class="tab-button" style="flex: 0.5;" onclick="logout()">Logout</button>
+  </div>
+
+  <div id="emiTab" class="tab-content active">
+    <iframe id="emiIframe" srcdoc="<!DOCTYPE html>
+    <html lang='en'>
+    <head><meta charset='UTF-8'><title>EMI Tracker</title><style>
+      :root {
+        --card-bg: #ffffff;
+        --text-color: #333333;
+        --border-color: #cccccc;
+        --shadow-color: rgba(0,0,0,0.1);
+        --progress-bg: #e0e0e0;
+        --btn-bg: #0077cc;
+        --btn-hover: #005fa3;
+        --progress-color: #4caf50;
+      }
+      
+      [data-theme='dark'] {
+        --card-bg: #1e1e1e;
+        --text-color: #f8f9fa;
+        --border-color: #333333;
+        --shadow-color: rgba(0,0,0,0.3);
+        --progress-bg: #333333;
+        --btn-bg: #1971c2;
+        --btn-hover: #1864ab;
+        --progress-color: #2e7d32;
+      }
+      
+      body {
+        font-family:'Segoe UI',sans-serif;
+        margin:20px;
+        background:var(--card-bg);
+        color:var(--text-color);
+        transition: background 0.3s ease, color 0.3s ease;
+      }
+      .section {
+        background:var(--card-bg);
+        padding:20px;
+        margin-bottom:20px;
+        border-radius:10px;
+        box-shadow:0 0 10px var(--shadow-color);
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+      }
+      input,select,button {
+        padding:8px;
+        margin:5px 0;
+        width:100%;
+        box-sizing:border-box;
+        background:var(--card-bg);
+        color:var(--text-color);
+        border:1px solid var(--border-color);
+        transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+      }
+      table {
+        width:100%;
+        border-collapse:collapse;
+        margin-top:15px;
+      }
+      table,th,td {
+        border:1px solid var(--border-color);
+      }
+      th,td {
+        padding:8px;
+        text-align:center;
+        color:var(--text-color);
+      }
+      .btn {
+        background:var(--btn-bg);
+        color:white;
+        border:none;
+        cursor:pointer;
+        transition: background 0.3s ease;
+      }
+      .btn:hover {
+        background:var(--btn-hover);
+      }
+      .progress-container {
+        background:var(--progress-bg);
+        border-radius:10px;
+        overflow:hidden;
+        margin-top:15px;
+        transition: background 0.3s ease;
+      }
+      .progress-bar {
+        height:20px;
+        background:var(--progress-color);
+        width:0%;
+        color:white;
+        text-align:center;
+        transition:width 0.4s ease, background 0.3s ease;
+      }
+      .data-actions {
+        margin-top:20px;
+        display:flex;
+        gap:10px;
+      }
+      .data-actions button {
+        flex:1;
+      }
+    </style></head>
+    <body>
+    <h2>EMI Projection & Management</h2>
+    <div class='section'>
+      <h3>EMI Calculator</h3>
+      <label>Loan Amount</label><input type='number' id='loanAmount' placeholder='Enter loan amount' />
+      <label>Down Payment (optional)</label><input type='number' id='downPayment' placeholder='Enter down payment' />
+      <label>Annual Interest Rate (%) (optional)</label><input type='number' id='interestRate' step='0.01' placeholder='e.g. 9.5 or 0' />
+      <label>First Payment Date (optional)</label><input type='date' id='startDate' />
+      <label>Choose Input Mode</label>
+      <select id='inputMode' onchange='toggleInputMode()'>
+        <option value='tenure'>Enter Loan Tenure</option>
+        <option value='emi'>Enter Monthly EMI</option>
+      </select>
+      <div id='tenureInput'><label>Loan Tenure (Months)</label><input type='number' id='loanTenure' placeholder='e.g. 60' /></div>
+      <div id='emiInput' style='display:none;'><label>Monthly EMI Amount</label><input type='number' id='emiAmount' placeholder='e.g. 10000' /></div>
+      <button class='btn' onclick='calculateEMI()'>Calculate</button>
+      <div id='emiResult' style='margin-top: 15px;'></div>
+      <div class='progress-container'><div id='progressBar' class='progress-bar'>0%</div></div>
+      <div id='scheduleTable'></div>
+      <div id='paymentTracker'></div>
+      <div class='data-actions'>
+        <button class='btn' onclick='exportEMIData()'>Export Data</button>
+        <button class='btn' onclick='importEMIData()'>Import Data</button>
+        <button class='btn' onclick='saveToCloud()'>Save to Cloud</button>
+        <button class='btn' onclick='loadFromCloud()'>Load from Cloud</button>
+        <input type='file' id='emiFileInput' style='display:none' accept='.json' onchange='handleEMIFileSelect(event)'>
+      </div>
+    </div>
+    <script>
+      let amortization=[];
+      function toggleInputMode(){const mode=document.getElementById('inputMode').value;document.getElementById('tenureInput').style.display=mode==='tenure'?'block':'none';document.getElementById('emiInput').style.display=mode==='emi'?'block':'none';}
+      function calculateEMI(){let P=parseFloat(document.getElementById('loanAmount').value);const down=parseFloat(document.getElementById('downPayment').value)||0;const interestInput=document.getElementById('interestRate').value;const r=interestInput?parseFloat(interestInput)/12/100:0;const startDateInput=document.getElementById('startDate').value;const startDate=startDateInput?new Date(startDateInput):null;const mode=document.getElementById('inputMode').value;P=P-down;if(P<=0)return alert('Loan amount must be more than down payment.');let n=0,emi=0;if(mode==='tenure'){n=parseInt(document.getElementById('loanTenure').value);if(!P||!n)return alert('Enter loan amount and tenure.');emi=r>0?(P*r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1):P/n;}else{emi=parseFloat(document.getElementById('emiAmount').value);if(!P||!emi)return alert('Enter loan amount and EMI.');let balance=P;while(balance>0&&n<600){const interest=balance*r;const principal=emi-interest;if(principal<=0)return alert('EMI too low. Increase EMI or reduce interest.');balance-=principal;n++;}}const totalPayment=emi*n;const totalInterest=totalPayment-P;document.getElementById('emiResult').innerHTML=`<strong>Monthly EMI:</strong> ₹${emi.toFixed(2)}<br/><strong>Total Months:</strong> ${n}<br/><strong>Total Interest:</strong> ₹${totalInterest.toFixed(2)}<br/><strong>Total Payment:</strong> ₹${totalPayment.toFixed(2)}<br/><strong>Remaining Balance:</strong> ₹<span id='balanceDisplay'>${P.toFixed(2)}</span>`;generateAmortization(P,r,n,emi,startDate);}
+      function generateAmortization(P,r,n,emi,startDate){let balance=P;let currentDate=startDate?new Date(startDate):null;amortization=[];for(let i=1;i<=n;i++){const interest=balance*r;const principal=emi-interest;balance-=principal;const dateLabel=currentDate?currentDate.toLocaleDateString('en-GB',{month:'short',year:'numeric'}):`Month ${i}`;if(currentDate)currentDate.setMonth(currentDate.getMonth()+1);amortization.push({month:i,date:dateLabel,emi,principal,interest,balance:Math.max(0,balance),paid:false});}renderSchedule();renderPaymentTracker();}
+      function renderSchedule(){let schedule='<table><tr><th>Month</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>';amortization.forEach(item=>{if(!item.paid){schedule+=`<tr><td>${item.date}</td><td>₹${item.principal.toFixed(2)}</td><td>₹${item.interest.toFixed(2)}</td><td>₹${Math.abs(item.balance).toFixed(2)}</td></tr>`;}});schedule+='</table>';document.getElementById('scheduleTable').innerHTML=schedule;}
+      function renderPaymentTracker(){let tracker='<h4>Payment Tracker</h4><table><tr><th>Month</th><th>Due</th><th>Status</th></tr>';amortization.forEach((item,i)=>{tracker+=`<tr><td>${item.date}</td><td>₹${item.emi.toFixed(2)}</td><td><input type='checkbox' onchange='togglePaid(${i})' ${item.paid?'checked':''}></td></tr>`;});tracker+='</table>';document.getElementById('paymentTracker').innerHTML=tracker;updateBalanceDisplay();updateProgressBar();}
+      function togglePaid(index){amortization[index].paid=!amortization[index].paid;renderSchedule();renderPaymentTracker();}
+      function updateBalanceDisplay(){let remaining=0;amortization.forEach(item=>{if(!item.paid)remaining+=item.principal;});document.getElementById('balanceDisplay').innerText=remaining.toFixed(2);}
+      function updateProgressBar(){const total=amortization.length;const paid=amortization.filter(x=>x.paid).length;const percent=total===0?0:Math.round((paid/total)*100);const bar=document.getElementById('progressBar');bar.style.width=`${percent}%`;bar.innerText=`${percent}%`;}
+      
+      // Export/Import functions
+      function exportEMIData() {
+        const data = {
+          loanAmount: document.getElementById('loanAmount').value,
+          downPayment: document.getElementById('downPayment').value,
+          interestRate: document.getElementById('interestRate').value,
+          startDate: document.getElementById('startDate').value,
+          inputMode: document.getElementById('inputMode').value,
+          loanTenure: document.getElementById('loanTenure').value,
+          emiAmount: document.getElementById('emiAmount').value,
+          amortization: amortization
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'emi_data.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      
+      function importEMIData() {
+        document.getElementById('emiFileInput').click();
+      }
+      
+      function handleEMIFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            
+            // Set form values
+            document.getElementById('loanAmount').value = data.loanAmount || '';
+            document.getElementById('downPayment').value = data.downPayment || '';
+            document.getElementById('interestRate').value = data.interestRate || '';
+            document.getElementById('startDate').value = data.startDate || '';
+            document.getElementById('inputMode').value = data.inputMode || 'tenure';
+            document.getElementById('loanTenure').value = data.loanTenure || '';
+            document.getElementById('emiAmount').value = data.emiAmount || '';
+            
+            // Set amortization data if available
+            if (data.amortization && data.amortization.length > 0) {
+              amortization = data.amortization;
+              renderSchedule();
+              renderPaymentTracker();
+            }
+            
+            toggleInputMode(); // Update input mode display
+            alert('EMI data imported successfully!');
+          } catch (error) {
+            alert('Error importing data: ' + error.message);
+          }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset file input
+      }
+
+      // Firebase functions
+      function saveToCloud() {
+        const data = {
+          loanAmount: document.getElementById('loanAmount').value,
+          downPayment: document.getElementById('downPayment').value,
+          interestRate: document.getElementById('interestRate').value,
+          startDate: document.getElementById('startDate').value,
+          inputMode: document.getElementById('inputMode').value,
+          loanTenure: document.getElementById('loanTenure').value,
+          emiAmount: document.getElementById('emiAmount').value,
+          amortization: amortization
+        };
+        
+        window.parent.postMessage({
+          type: 'saveEMIData',
+          data: data
+        }, '*');
+      }
+
+      function loadFromCloud() {
+        window.parent.postMessage({
+          type: 'loadEMIData'
+        }, '*');
+      }
+
+      // Theme handling
+      function updateIframeTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+
+      // Listen for messages from parent
+      window.addEventListener('message', function(event) {
+        if (event.data.type === 'loadEMIDataResponse') {
+          const data = event.data.data;
+          if (data) {
+            document.getElementById('loanAmount').value = data.loanAmount || '';
+            document.getElementById('downPayment').value = data.downPayment || '';
+            document.getElementById('interestRate').value = data.interestRate || '';
+            document.getElementById('startDate').value = data.startDate || '';
+            document.getElementById('inputMode').value = data.inputMode || 'tenure';
+            document.getElementById('loanTenure').value = data.loanTenure || '';
+            document.getElementById('emiAmount').value = data.emiAmount || '';
+            
+            if (data.amortization && data.amortization.length > 0) {
+              amortization = data.amortization;
+              renderSchedule();
+              renderPaymentTracker();
+            }
+            
+            toggleInputMode();
+            alert('EMI data loaded from cloud!');
+          } else {
+            alert('No EMI data found in cloud.');
+          }
+        } else if (event.data.type === 'themeChanged') {
+          updateIframeTheme(event.data.theme);
+        }
+      });
+
+      // Initialize with parent theme
+      window.addEventListener('DOMContentLoaded', () => {
+        window.parent.postMessage({ type: 'getCurrentTheme' }, '*');
+      });
+    </script>
+    </body>
+    </html>
+    " height="1500"></iframe>
+  </div>
+
+  <div id="salaryTab" class="tab-content">
+    <iframe id="salaryIframe" srcdoc="<!DOCTYPE html>
+    <html lang='en'>
+    <head><meta charset='UTF-8'><title>Salary Slip</title>
+    <style>
+      :root {
+        --card-bg: #ffffff;
+        --text-color: #333333;
+        --border-color: #cccccc;
+        --shadow-color: rgba(0,0,0,0.1);
+        --btn-bg: #007bff;
+        --btn-hover: #0056b3;
+      }
+      
+      [data-theme='dark'] {
+        --card-bg: #1e1e1e;
+        --text-color: #f8f9fa;
+        --border-color: #333333;
+        --shadow-color: rgba(0,0,0,0.3);
+        --btn-bg: #1971c2;
+        --btn-hover: #1864ab;
+      }
+      
+      body { 
+        font-family: Arial, sans-serif; 
+        padding: 20px; 
+        background: var(--card-bg); 
+        color: var(--text-color);
+        transition: background 0.3s ease, color 0.3s ease;
+      } 
+      h2,h3 { 
+        color: var(--text-color);
+      } 
+      .section { 
+        background: var(--card-bg); 
+        padding: 15px; 
+        margin-bottom: 20px; 
+        border-radius: 10px; 
+        box-shadow: 0 0 10px var(--shadow-color);
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+      } 
+      label { 
+        display: block; 
+        margin-bottom: 10px; 
+        color: var(--text-color);
+      } 
+      input { 
+        padding: 5px; 
+        margin-left: 10px; 
+        width: 200px; 
+        background: var(--card-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+      } 
+      button { 
+        padding: 10px 20px; 
+        background-color: var(--btn-bg); 
+        color: white; 
+        border: none; 
+        cursor: pointer; 
+        border-radius: 5px; 
+        transition: background-color 0.3s ease;
+      } 
+      button:hover { 
+        background-color: var(--btn-hover); 
+      } 
+      #salarySlip { 
+        white-space: pre-wrap; 
+        background: var(--card-bg); 
+        padding: 20px; 
+        border-radius: 10px; 
+        border: 1px solid var(--border-color); 
+        color: var(--text-color);
+        transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+      } 
+      @media print { 
+        body * { visibility: hidden; } 
+        #salarySlip, #salarySlip * { visibility: visible; } 
+        #salarySlip { position: absolute; left: 0; top: 0; width: 100%; } 
+      } 
+      .data-actions { 
+        margin-top: 20px; 
+        display: flex; 
+        gap: 10px; 
+      } 
+      .data-actions button { 
+        flex: 1; 
+      }
+    </style>
+    </head>
+    <body>
+      <h2>Salary Slip Generator with Attendance & OT</h2>
+      <div class='section'><h3>Employee Details</h3>
+        <label>Name: <input type='text' id='empName'></label>
+        <label>Designation: <input type='text' id='empDesg'></label>
+        <label>Month: <input type='month' id='salaryMonth'></label>
+        <label>Basic Salary (INR): <input type='number' id='basicSalary'></label>
+        <label>Bonus (INR): <input type='number' id='bonus' value='0'></label>
+        <label>Deductions (INR): <input type='number' id='deductions' value='0'></label>
+      </div>
+      <div class='section'><h3>Attendance Sheet (Out of 26 Working Days)</h3>
+        <label>Present Days: <input type='number' id='presentDays' min='0' max='26'></label>
+        <label>Leave Days: <input type='number' id='leaveDays' min='0' max='26'></label>
+      </div>
+      <div class='section'><h3>Overtime Details</h3>
+        <label>OT Hours: <input type='number' id='otHours' min='0'></label>
+        <label>Rate per OT Hour (INR): <input type='number' id='otRate' min='0'></label>
+      </div>
+      <div class='section'>
+        <button onclick='generateSlip()'>Generate Salary Slip</button>
+      </div>
+      <div class='section' id='salarySlip'></div>
+      <div class='section data-actions'>
+        <button onclick='window.print()'>Print Salary Slip</button>
+        <button onclick='exportSalaryData()'>Export Data</button>
+        <button onclick='importSalaryData()'>Import Data</button>
+        <button onclick='saveToCloud()'>Save to Cloud</button>
+        <button onclick='loadFromCloud()'>Load from Cloud</button>
+        <input type='file' id='salaryFileInput' style='display:none' accept='.json' onchange='handleSalaryFileSelect(event)'>
+      </div>
+      <script>
+        function generateSlip() {
+          const name = document.getElementById('empName').value;
+          const desg = document.getElementById('empDesg').value;
+          const month = document.getElementById('salaryMonth').value;
+          const basic = parseFloat(document.getElementById('basicSalary').value || 0);
+          const bonus = parseFloat(document.getElementById('bonus').value || 0);
+          const deductions = parseFloat(document.getElementById('deductions').value || 0);
+          const present = parseInt(document.getElementById('presentDays').value || 0);
+          const leaves = parseInt(document.getElementById('leaveDays').value || 0);
+          const otHours = parseInt(document.getElementById('otHours').value || 0);
+          const otRate = parseFloat(document.getElementById('otRate').value || 0);
+          const totalDays = 26;
+
+          const perDaySalary = basic / totalDays;
+          const attendanceSalary = perDaySalary * present;
+          const otPay = otHours * otRate;
+          const totalPay = attendanceSalary + otPay + bonus - deductions;
+
+          const slip = `
+    SALARY SLIP
+    Month: ${month}
+
+    Employee Name   : ${name}
+    Designation     : ${desg}
+
+    Attendance:
+    Present Days    : ${present} / ${totalDays}
+    Leave Days      : ${leaves}
+
+    Overtime:
+    OT Hours        : ${otHours}
+    Rate per Hour   : ₹${otRate.toFixed(2)}
+    OT Pay          : ₹${otPay.toFixed(2)}
+
+    Salary Breakdown:
+    Basic Salary    : ₹${basic.toFixed(2)}
+    Per Day Salary  : ₹${perDaySalary.toFixed(2)}
+    Attendance Pay  : ₹${attendanceSalary.toFixed(2)}
+    Bonus           : ₹${bonus.toFixed(2)}
+    Deductions      : ₹${deductions.toFixed(2)}
+
+    ----------------------------------
+    Net Payable     : ₹${totalPay.toFixed(2)}
+    ----------------------------------
+          `;
+
+          document.getElementById('salarySlip').textContent = slip;
+        }
+        
+        // Export/Import functions
+        function exportSalaryData() {
+          const data = {
+            empName: document.getElementById('empName').value,
+            empDesg: document.getElementById('empDesg').value,
+            salaryMonth: document.getElementById('salaryMonth').value,
+            basicSalary: document.getElementById('basicSalary').value,
+            bonus: document.getElementById('bonus').value,
+            deductions: document.getElementById('deductions').value,
+            presentDays: document.getElementById('presentDays').value,
+            leaveDays: document.getElementById('leaveDays').value,
+            otHours: document.getElementById('otHours').value,
+            otRate: document.getElementById('otRate').value,
+            slipContent: document.getElementById('salarySlip').textContent
+          };
+          
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'salary_data.json';
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+        
+        function importSalaryData() {
+          document.getElementById('salaryFileInput').click();
+        }
+        
+        function handleSalaryFileSelect(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              const data = JSON.parse(e.target.result);
+              
+              // Set form values
+              document.getElementById('empName').value = data.empName || '';
+              document.getElementById('empDesg').value = data.empDesg || '';
+              document.getElementById('salaryMonth').value = data.salaryMonth || '';
+              document.getElementById('basicSalary').value = data.basicSalary || '';
+              document.getElementById('bonus').value = data.bonus || '0';
+              document.getElementById('deductions').value = data.deductions || '0';
+              document.getElementById('presentDays').value = data.presentDays || '';
+              document.getElementById('leaveDays').value = data.leaveDays || '';
+              document.getElementById('otHours').value = data.otHours || '';
+              document.getElementById('otRate').value = data.otRate || '';
+              
+              // Set slip content if available
+              if (data.slipContent) {
+                document.getElementById('salarySlip').textContent = data.slipContent;
+              }
+              
+              alert('Salary data imported successfully!');
+            } catch (error) {
+              alert('Error importing data: ' + error.message);
+            }
+          };
+          reader.readAsText(file);
+          event.target.value = ''; // Reset file input
+        }
+
+        // Firebase functions
+        function saveToCloud() {
+          const data = {
+            empName: document.getElementById('empName').value,
+            empDesg: document.getElementById('empDesg').value,
+            salaryMonth: document.getElementById('salaryMonth').value,
+            basicSalary: document.getElementById('basicSalary').value,
+            bonus: document.getElementById('bonus').value,
+            deductions: document.getElementById('deductions').value,
+            presentDays: document.getElementById('presentDays').value,
+            leaveDays: document.getElementById('leaveDays').value,
+            otHours: document.getElementById('otHours').value,
+            otRate: document.getElementById('otRate').value,
+            slipContent: document.getElementById('salarySlip').textContent
+          };
+          
+          window.parent.postMessage({
+            type: 'saveSalaryData',
+            data: data
+          }, '*');
+        }
+
+        function loadFromCloud() {
+          window.parent.postMessage({
+            type: 'loadSalaryData'
+          }, '*');
+        }
+
+        // Theme handling
+        function updateIframeTheme(theme) {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+          if (event.data.type === 'loadSalaryDataResponse') {
+            const data = event.data.data;
+            if (data) {
+              document.getElementById('empName').value = data.empName || '';
+              document.getElementById('empDesg').value = data.empDesg || '';
+              document.getElementById('salaryMonth').value = data.salaryMonth || '';
+              document.getElementById('basicSalary').value = data.basicSalary || '';
+              document.getElementById('bonus').value = data.bonus || '0';
+              document.getElementById('deductions').value = data.deductions || '0';
+              document.getElementById('presentDays').value = data.presentDays || '';
+              document.getElementById('leaveDays').value = data.leaveDays || '';
+              document.getElementById('otHours').value = data.otHours || '';
+              document.getElementById('otRate').value = data.otRate || '';
+              
+              if (data.slipContent) {
+                document.getElementById('salarySlip').textContent = data.slipContent;
+              }
+              
+              alert('Salary data loaded from cloud!');
+            } else {
+              alert('No salary data found in cloud.');
+            }
+          } else if (event.data.type === 'themeChanged') {
+            updateIframeTheme(event.data.theme);
+          }
+        });
+
+        // Initialize with parent theme
+        window.addEventListener('DOMContentLoaded', () => {
+          window.parent.postMessage({ type: 'getCurrentTheme' }, '*');
+        });
+      </script>
+    </body>
+    </html>" height="1200"></iframe>
+  </div>
+
+  <div id="studyTab" class="tab-content">
+    <iframe id="studyIframe" srcdoc="<!DOCTYPE html>
+    <html lang='en'>
+    <head><meta charset='UTF-8'><title>Study Planner</title>
+    <style>
+      :root {
+        --card-bg: #ffffff;
+        --text-color: #333333;
+        --border-color: #cccccc;
+        --shadow-color: rgba(0,0,0,0.1);
+        --btn-bg: #007bff;
+        --btn-hover: #0056b3;
+        --progress-bg: #e0e0e0;
+        --progress-fill: #28a745;
+        --remove-btn: #dc3545;
+        --remove-hover: #a71d2a;
+      }
+      
+      [data-theme='dark'] {
+        --card-bg: #1e1e1e;
+        --text-color: #f8f9fa;
+        --border-color: #333333;
+        --shadow-color: rgba(0,0,0,0.3);
+        --btn-bg: #1971c2;
+        --btn-hover: #1864ab;
+        --progress-bg: #333333;
+        --progress-fill: #2e7d32;
+        --remove-btn: #c82333;
+        --remove-hover: #9a1a27;
+      }
+      
+      body { 
+        font-family: 'Segoe UI', sans-serif; 
+        background-color: var(--card-bg); 
+        margin: 0; 
+        padding: 0; 
+        color: var(--text-color);
+        transition: background 0.3s ease, color 0.3s ease;
+      } 
+      .container { 
+        max-width: 960px; 
+        margin: 40px auto; 
+        padding: 20px; 
+        background-color: var(--card-bg); 
+        border-radius: 12px; 
+        box-shadow: 0 8px 20px var(--shadow-color);
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+      } 
+      h1 { 
+        text-align: center; 
+        color: var(--text-color);
+      } 
+      .section-title { 
+        font-size: 20px; 
+        color: var(--text-color); 
+        margin-bottom: 10px; 
+        border-bottom: 2px solid var(--border-color); 
+        padding-bottom: 5px; 
+      } 
+      .todo-input { 
+        display: flex; 
+        gap: 10px; 
+        flex-wrap: wrap; 
+        margin-bottom: 20px; 
+      } 
+      input[type='text'], input[type='date'], select { 
+        padding: 10px; 
+        border: 1px solid var(--border-color); 
+        border-radius: 8px; 
+        flex: 1; 
+        background: var(--card-bg);
+        color: var(--text-color);
+        transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+      } 
+      button { 
+        padding: 10px 20px; 
+        background-color: var(--btn-bg); 
+        color: white; 
+        border: none; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        transition: background-color 0.3s ease;
+      } 
+      button:hover { 
+        background-color: var(--btn-hover); 
+      } 
+      ul { 
+        list-style: none; 
+        padding: 0; 
+      } 
+      li { 
+        padding: 10px; 
+        margin-bottom: 10px; 
+        background-color: var(--card-bg); 
+        border-radius: 8px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        border: 1px solid var(--border-color);
+        transition: background 0.3s ease, border-color 0.3s ease;
+      } 
+      .task-complete { 
+        text-decoration: line-through; 
+        color: var(--text-light);
+      } 
+      .remove-btn { 
+        background-color: var(--remove-btn); 
+        margin-left: 10px; 
+      } 
+      .remove-btn:hover { 
+        background-color: var(--remove-hover); 
+      } 
+      .progress-bar-container { 
+        margin-top: 30px; 
+      } 
+      .progress-bar { 
+        width: 100%; 
+        background-color: var(--progress-bg); 
+        border-radius: 20px; 
+        overflow: hidden; 
+        height: 24px; 
+        margin-top: 10px; 
+        transition: background 0.3s ease;
+      } 
+      .progress-fill { 
+        height: 100%; 
+        background-color: var(--progress-fill); 
+        width: 0%; 
+        text-align: center; 
+        color: white; 
+        font-weight: bold; 
+        line-height: 24px; 
+        transition: width 0.3s ease, background 0.3s ease;
+      } 
+      .filter-section { 
+        display: flex; 
+        gap: 10px; 
+        margin: 20px 0; 
+      } 
+      .data-actions { 
+        margin-top: 20px; 
+        display: flex; 
+        gap: 10px; 
+      } 
+      .data-actions button { 
+        flex: 1; 
+      }
+    </style>
+    </head>
+    <body>
+      <div class='container'>
+        <h1>Study Planner & To-Do List</h1>
+        <div class='planner-section'>
+          <div class='section-title'>Add Study Task</div>
+          <div class='todo-input'>
+            <input type='text' id='taskInput' placeholder='Task'>
+            <input type='text' id='subjectInput' placeholder='Subject'>
+            <input type='date' id='taskDate'>
+            <select id='taskPriority'>
+              <option value='Low'>Low</option>
+              <option value='Medium' selected>Medium</option>
+              <option value='High'>High</option>
+            </select>
+            <button onclick='addTask()'>Add</button>
+            <button onclick='exportTasks()'>Export</button>
+          </div>
+        </div>
+        <div class='filter-section'>
+          <select id='filterSubject' onchange='renderTasks()'>
+            <option value=''>All Subjects</option>
+          </select>
+          <select id='filterPriority' onchange='renderTasks()'>
+            <option value=''>All Priorities</option>
+            <option value='High'>High</option>
+            <option value='Medium'>Medium</option>
+            <option value='Low'>Low</option>
+          </select>
+        </div>
+        <ul id='taskList'></ul>
+        <div class='progress-bar-container'>
+          <div class='section-title'>Progress</div>
+          <div class='progress-bar'><div class='progress-fill' id='progressFill'>0%</div></div>
+        </div>
+        <div class='data-actions'>
+          <button onclick='importTasks()'>Import Tasks</button>
+          <button onclick='saveToCloud()'>Save to Cloud</button>
+          <button onclick='loadFromCloud()'>Load from Cloud</button>
+          <input type='file' id='taskFileInput' style='display:none' accept='.json' onchange='handleTaskFileSelect(event)'>
+        </div>
+      </div>
+      <script>
+        let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+        function saveTasks() { localStorage.setItem('tasks', JSON.stringify(tasks)); }
+        function addTask() {
+          const taskInput = document.getElementById('taskInput');
+          const subjectInput = document.getElementById('subjectInput');
+          const taskDate = document.getElementById('taskDate');
+          const taskPriority = document.getElementById('taskPriority');
+          const taskText = taskInput.value.trim();
+          const subject = subjectInput.value.trim();
+          const date = taskDate.value;
+          const priority = taskPriority.value;
+          if (!taskText) return;
+          tasks.push({ text: taskText, subject, date, priority, completed: false });
+          saveTasks();
+          renderTasks();
+          taskInput.value = '';
+          subjectInput.value = '';
+          taskDate.value = '';
+          taskPriority.value = 'Medium';
+        }
+        function renderTasks() {
+          const list = document.getElementById('taskList');
+          const subjectFilter = document.getElementById('filterSubject').value;
+          const priorityFilter = document.getElementById('filterPriority').value;
+          list.innerHTML = '';
+          const subjects = new Set();
+          tasks.forEach(task => subjects.add(task.subject));
+          const subjectSelect = document.getElementById('filterSubject');
+          subjectSelect.innerHTML = `<option value=''>All Subjects</option>`;
+          subjects.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub; opt.textContent = sub; subjectSelect.appendChild(opt);
+          });
+          let filteredTasks = tasks.filter(t => (subjectFilter === '' || t.subject === subjectFilter) && (priorityFilter === '' || t.priority === priorityFilter));
+          filteredTasks.forEach((task, index) => {
+            const li = document.createElement('li');
+            const className = task.completed ? 'task-complete' : '';
+            li.innerHTML = `<span class='${className}'><input type='checkbox' onchange='toggleComplete(${index})' ${task.completed ? 'checked' : ''}> <strong>${task.text}</strong> — ${task.subject} — ${task.date} [${task.priority}]</span><div><button class='remove-btn' onclick='removeTask(${index})'>Delete</button></div>`;
+            list.appendChild(li);
+          });
+          updateProgress();
+        }
+        function toggleComplete(index) { tasks[index].completed = !tasks[index].completed; saveTasks(); renderTasks(); }
+        function removeTask(index) { tasks.splice(index, 1); saveTasks(); renderTasks(); }
+        function updateProgress() {
+          const total = tasks.length;
+          const completed = tasks.filter(t => t.completed).length;
+          const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+          const bar = document.getElementById('progressFill');
+          bar.style.width = progress + '%';
+          bar.textContent = progress + '%';
+        }
+        function exportTasks() {
+          const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'study_tasks.json'; a.click(); URL.revokeObjectURL(url);
+        }
+        function importTasks() {
+          document.getElementById('taskFileInput').click();
+        }
+        function handleTaskFileSelect(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              const importedTasks = JSON.parse(e.target.result);
+              if (Array.isArray(importedTasks)) {
+                tasks = importedTasks;
+                saveTasks();
+                renderTasks();
+                alert('Tasks imported successfully!');
+              } else {
+                alert('Invalid task data format.');
+              }
+            } catch (error) {
+              alert('Error importing tasks: ' + error.message);
+            }
+          };
+          reader.readAsText(file);
+          event.target.value = ''; // Reset file input
+        }
+
+        // Firebase functions
+        function saveToCloud() {
+          window.parent.postMessage({
+            type: 'saveStudyData',
+            data: tasks
+          }, '*');
+        }
+
+        function loadFromCloud() {
+          window.parent.postMessage({
+            type: 'loadStudyData'
+          }, '*');
+        }
+
+        // Theme handling
+        function updateIframeTheme(theme) {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', function(event) {
+          if (event.data.type === 'loadStudyDataResponse') {
+            const data = event.data.data;
+            if (data && Array.isArray(data)) {
+              tasks = data;
+              saveTasks();
+              renderTasks();
+              alert('Study tasks loaded from cloud!');
+            } else {
+              alert('No study tasks found in cloud.');
+            }
+          } else if (event.data.type === 'themeChanged') {
+            updateIframeTheme(event.data.theme);
+          }
+        });
+
+        // Initialize with parent theme
+        window.addEventListener('DOMContentLoaded', () => {
+          window.parent.postMessage({ type: 'getCurrentTheme' }, '*');
+        });
+
+        renderTasks();
+      </script>
+    </body>
+    </html>" height="1500"></iframe>
+  </div>
+</div>
+
+<script>
+  // Firebase configuration with your provided settings
+  const firebaseConfig = {
+    apiKey: "AIzaSyD8Jn_pOd3ikyczCUGTu0rHB4MXZHNxCKU",
+    authDomain: "income-2dee6.firebaseapp.com",
+    databaseURL: "https://income-2dee6-default-rtdb.firebaseio.com",
+    projectId: "income-2dee6",
+    storageBucket: "income-2dee6.appspot.com",
+    messagingSenderId: "800831075312",
+    appId: "1:800831075312:web:7e2cc2476533023d512335",
+    measurementId: "G-EZJTP0DCPD"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+  let currentUser = null;
+
+  // Theme management
+  function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+    
+    // Notify iframes about theme change
+    const iframes = [document.getElementById('emiIframe'), document.getElementById('salaryIframe'), document.getElementById('studyIframe')];
+    iframes.forEach(iframe => {
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          type: 'themeChanged',
+          theme: newTheme
+        }, '*');
+      }
+    });
+  }
+
+  function updateThemeIcon(theme) {
+    const icon = document.getElementById('themeIcon');
+    icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+    const toggleTexts = document.querySelectorAll('.theme-toggle-text');
+    toggleTexts[0].style.fontWeight = theme === 'light' ? 'bold' : 'normal';
+    toggleTexts[1].style.fontWeight = theme === 'dark' ? 'bold' : 'normal';
+  }
+
+  function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+  }
+
+  // Handle theme requests from iframes
+  window.addEventListener('message', function(event) {
+    if (event.data.type === 'getCurrentTheme') {
+      const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+      event.source.postMessage({
+        type: 'themeChanged',
+        theme: currentTheme
+      }, '*');
+    }
+  });
+
+  // Authentication functions
+  function login() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+        currentUser = userCredential.user;
+        document.getElementById('authStatus').textContent = 'Login successful!';
+        document.getElementById('authContainer').classList.add('hidden');
+        document.getElementById('appContent').classList.remove('hidden');
+        loadAllData();
+      })
+      .catch((error) => {
+        document.getElementById('authStatus').textContent = error.message;
+      });
+  }
+
+  function signup() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    firebase.auth().createUserWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+        currentUser = userCredential.user;
+        document.getElementById('authStatus').textContent = 'Account created successfully!';
+        document.getElementById('authContainer').classList.add('hidden');
+        document.getElementById('appContent').classList.remove('hidden');
+      })
+      .catch((error) => {
+        document.getElementById('authStatus').textContent = error.message;
+      });
+  }
+
+  function logout() {
+    firebase.auth().signOut().then(() => {
+      currentUser = null;
+      document.getElementById('authContainer').classList.remove('hidden');
+      document.getElementById('appContent').classList.add('hidden');
+      document.getElementById('authStatus').textContent = '';
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+    });
+  }
+
+  // Data handling functions
+  function saveEMIData(data) {
+    if (!currentUser) return;
+    database.ref('users/' + currentUser.uid + '/emiData').set(data)
+      .then(() => console.log('EMI data saved'))
+      .catch(error => console.error('Error saving EMI data:', error));
+  }
+
+  function loadEMIData() {
+    if (!currentUser) return null;
+    return database.ref('users/' + currentUser.uid + '/emiData').once('value')
+      .then(snapshot => snapshot.val())
+      .catch(error => {
+        console.error('Error loading EMI data:', error);
+        return null;
+      });
+  }
+
+  function saveSalaryData(data) {
+    if (!currentUser) return;
+    database.ref('users/' + currentUser.uid + '/salaryData').set(data)
+      .then(() => console.log('Salary data saved'))
+      .catch(error => console.error('Error saving salary data:', error));
+  }
+
+  function loadSalaryData() {
+    if (!currentUser) return null;
+    return database.ref('users/' + currentUser.uid + '/salaryData').once('value')
+      .then(snapshot => snapshot.val())
+      .catch(error => {
+        console.error('Error loading salary data:', error);
+        return null;
+      });
+  }
+
+  function saveStudyData(data) {
+    if (!currentUser) return;
+    database.ref('users/' + currentUser.uid + '/studyData').set(data)
+      .then(() => console.log('Study data saved'))
+      .catch(error => console.error('Error saving study data:', error));
+  }
+
+  function loadStudyData() {
+    if (!currentUser) return null;
+    return database.ref('users/' + currentUser.uid + '/studyData').once('value')
+      .then(snapshot => snapshot.val())
+      .catch(error => {
+        console.error('Error loading study data:', error);
+        return null;
+      });
+  }
+
+  function loadAllData() {
+    // Load EMI Data
+    loadEMIData().then(data => {
+      if (data) {
+        document.getElementById('emiIframe').contentWindow.postMessage({
+          type: 'loadEMIDataResponse',
+          data: data
+        }, '*');
+      }
+    });
+
+    // Load Salary Data
+    loadSalaryData().then(data => {
+      if (data) {
+        document.getElementById('salaryIframe').contentWindow.postMessage({
+          type: 'loadSalaryDataResponse',
+          data: data
+        }, '*');
+      }
+    });
+
+    // Load Study Data
+    loadStudyData().then(data => {
+      if (data) {
+        document.getElementById('studyIframe').contentWindow.postMessage({
+          type: 'loadStudyDataResponse',
+          data: data
+        }, '*');
+      }
+    });
+  }
+
+  // Tab functionality
+  function showTab(tabId) {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    document.querySelector(`button[onclick="showTab('${tabId}')"]`).classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+
+  // Listen for messages from iframes
+  window.addEventListener('message', function(event) {
+    if (!event.data || !event.data.type) return;
+    
+    switch(event.data.type) {
+      case 'saveEMIData':
+        saveEMIData(event.data.data);
+        break;
+      case 'loadEMIData':
+        loadEMIData().then(data => {
+          event.source.postMessage({
+            type: 'loadEMIDataResponse',
+            data: data
+          }, '*');
+        });
+        break;
+      case 'saveSalaryData':
+        saveSalaryData(event.data.data);
+        break;
+      case 'loadSalaryData':
+        loadSalaryData().then(data => {
+          event.source.postMessage({
+            type: 'loadSalaryDataResponse',
+            data: data
+          }, '*');
+        });
+        break;
+      case 'saveStudyData':
+        saveStudyData(event.data.data);
+        break;
+      case 'loadStudyData':
+        loadStudyData().then(data => {
+          event.source.postMessage({
+            type: 'loadStudyDataResponse',
+            data: data
+          }, '*');
+        });
+        break;
+    }
+  });
+
+  // Initialize theme and check auth state on load
+  window.addEventListener('DOMContentLoaded', () => {
+    initializeTheme();
+    
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        currentUser = user;
+        document.getElementById('authContainer').classList.add('hidden');
+        document.getElementById('appContent').classList.remove('hidden');
+        loadAllData();
+      } else {
+        document.getElementById('authContainer').classList.remove('hidden');
+        document.getElementById('appContent').classList.add('hidden');
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
